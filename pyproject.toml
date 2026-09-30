@@ -1,0 +1,96 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "strands-tidb-filesystem"
+dynamic = ["version"]
+description = "TiDB Cloud Filesystem storage and session manager for Strands Agents (drop-ins for S3Storage and S3SessionManager)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Tadatoshi Sekiguchi", email = "tadatoshi.sekiguchi@pingcap.com"}
+]
+keywords = ["strands", "agents", "ai", "session", "storage", "filesystem", "tidb", "agentcore"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+dependencies = [
+    "strands-agents>=1.56.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/tadapin/strands-tidb-filesystem"
+Documentation = "https://github.com/tadapin/strands-tidb-filesystem#readme"
+Repository = "https://github.com/tadapin/strands-tidb-filesystem"
+Issues = "https://github.com/tadapin/strands-tidb-filesystem/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0,<9.0.0",
+    "pytest-asyncio>=0.25.0,<1.0.0",
+    "ruff>=0.11.0,<1.0.0",
+    "mypy>=1.15.0,<2.0.0",
+    "moto[s3]>=5.0.0,<6.0.0",
+    "hatch",
+]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+# Lets `pip install .` work from a Docker build context that has no .git.
+fallback_version = "0.0.0"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/strands_tidb_filesystem"]
+
+[tool.hatch.envs.default]
+dependencies = [
+    "moto[s3]>=5.0.0,<6.0.0",
+    "pytest>=8.0.0,<9.0.0",
+    "pytest-asyncio>=0.25.0,<1.0.0",
+    "ruff>=0.11.0,<1.0.0",
+    "mypy>=1.15.0,<2.0.0",
+]
+
+[tool.hatch.envs.default.scripts]
+test = "pytest {args}"
+lint = "ruff check src tests"
+format = "ruff format src tests"
+typecheck = "mypy src"
+prepare = ["format", "lint", "typecheck", "test"]
+
+[tool.ruff]
+line-length = 120
+include = ["src/**/*.py", "tests/**/*.py"]
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+markers = ["integ: runs against a real TiDB Cloud Filesystem (needs ti, TI_FS_TOKEN and TI_REGION_CODE)"]
+addopts = "-m 'not integ'"

@@ -1,0 +1,143 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  schedule:
+    # Weekly canary against the newest SDK release. The template's open
+    # floor (strands-agents>=1.0.0) means new users always resolve the
+    # latest SDK — this catches SDK drift (removed exports, changed types)
+    # before a new user hits it.
+    - cron: '0 6 * * 1'
+  # Manual run of the live tests against a scratch file system.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+
+jobs:
+  test:
+    name: Test - Python ${{ matrix.python-version }}
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install hatch
+        run: pip install hatch
+
+      - name: Run tests
+        run: hatch run test
+
+  lint:
+    name: Lint
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install hatch
+        run: pip install hatch
+
+      - name: Check formatting
+        run: hatch run format
+
+      - name: Run linter
+        run: hatch run lint
+
+      - name: Type check
+        run: hatch run typecheck
+
+  sdk-compat:
+    name: Latest SDK compatibility
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install hatch
+        run: pip install hatch
+
+      - name: Update SDK to latest
+        run: |
+          hatch run pip install --upgrade strands-agents
+          hatch run pip show strands-agents
+
+      - name: Type check
+        run: hatch run typecheck
+
+      - name: Run tests
+        run: hatch run test
+
+  integ:
+    name: Live TiDB Cloud Filesystem tests
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      TI_FS_TOKEN: ${{ secrets.TI_FS_TOKEN }}
+      TI_REGION_CODE: ${{ vars.TI_REGION_CODE }}
+      TI_TELEMETRY: "off"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install ti
+        run: |
+          curl -fsSL https://github.com/tidbcloud/ti-cli/releases/latest/download/install.sh | sh -s -- --yes
+          echo "$HOME/.ti/bin" >> "$GITHUB_PATH"
+
+      - name: Install hatch
+        run: pip install hatch
+
+      - name: Run live tests
+        run: hatch run test -m integ -v
