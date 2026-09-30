@@ -1,2 +1,3 @@
 bedrock-agentcore
 strands-agents>=1.56.0
+strands-tidb-filesystem @ git+https://github.com/tadapin/strands-tidb-filesystem.git@v0.1.0
