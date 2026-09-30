@@ -6,3 +6,9 @@
 .mypy_cache
 .ruff_cache
 dist
+
+# Never bake local secrets or local-only material into images
+.env
+.env.*
+*.pem
+support/

@@ -22,9 +22,16 @@ def _scope(root: str, path: str | None) -> str:
     return target
 
 
-def _format(entries: list[RemoteEntry], limit: int) -> str:
-    lines = [entry.path for entry in entries[:limit]]
+def _format(entries: list[RemoteEntry], root: str, limit: int) -> str:
+    # Only report paths inside root, even if the service returned more (defence in depth).
+    lines = [entry.path for entry in entries if _inside(entry.path, root)][:limit]
     return "\n".join(lines) if lines else "No matching files."
+
+
+def _inside(path: str, root: str) -> bool:
+    root = "/" + root.strip("/")
+    target = posixpath.normpath("/" + path.lstrip(":/"))
+    return root == "/" or target == root or target.startswith(root + "/")
 
 
 def make_search_files(
@@ -56,7 +63,7 @@ def make_search_files(
             entries = await ti.search(query, path=_scope(root, path), limit=limit)
         except (TiFSError, ValueError) as e:
             return f"Search failed: {e}"
-        return _format(entries, limit)
+        return _format(entries, root, limit)
 
     return search_files
 
@@ -109,6 +116,6 @@ def make_find_files(
             )
         except (TiFSError, ValueError) as e:
             return f"Find failed: {e}"
-        return _format(entries, limit)
+        return _format(entries, root, limit)
 
     return find_files

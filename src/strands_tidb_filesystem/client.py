@@ -349,6 +349,12 @@ class TiFSClient:
         The companion returns at most 20 results; ``limit`` can only lower that. Results
         carry paths only, and paths containing spaces are truncated.
         """
+        # `ti` passes the pattern on to its file system component as a plain argument, and that
+        # component strips anything that looks like its own flags (e.g. "--json", "--layer=x")
+        # wherever it appears, which would turn the path into the query and search from "/".
+        # A leading space keeps the query's meaning but no longer matches those flags.
+        if pattern.startswith("-"):
+            pattern = " " + pattern
         args = ["fs", "search-file-content", "--pattern", pattern, "--path", path]
         if limit:
             args += ["--limit", str(limit)]
@@ -368,6 +374,8 @@ class TiFSClient:
     ) -> list[RemoteEntry]:
         """Find files (not directories) by name glob, tag, date (YYYY-MM-DD) or size. Empty if ``path`` is missing.
 
+        Raises ``ValueError`` if a filter value starts with ``-``.
+
         The server returns at most 100 results, ordered by path; ``limit`` can only lower
         that. Paths containing spaces are truncated.
         """
@@ -381,7 +389,11 @@ class TiFSClient:
             ("--max-size-bytes", max_size),
         ):
             if value is not None:
-                args += [flag, str(value)]
+                text = str(value)
+                # Values starting with "-" can be taken as flags further down the chain (see search()).
+                if text.startswith("-"):
+                    raise ValueError(f"{flag} must not start with '-': {text!r}")
+                args += [flag, text]
         if limit:
             args += ["--limit", str(limit)]
         return _results(await self._run(_Command(args, tolerate=(TiFSNotFoundError,))))
